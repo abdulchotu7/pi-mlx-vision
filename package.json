@@ -1,6 +1,6 @@
 {
   "name": "pi-mlx-vision",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Local MLX vision for text-only models on Apple Silicon Macs: a describe_image tool backed by LiquidAI LFM2.5-VL-3B-MLX-8bit, so non-vision models (DeepSeek, etc.) can see images.",
   "keywords": [
     "pi-package",

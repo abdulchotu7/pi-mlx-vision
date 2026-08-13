@@ -22,14 +22,17 @@ Registers a `describe_image` tool backed by a local vision language model so you
 ## Install
 
 ```bash
-# from the npm registry (listed on pi.dev/packages)
-pi install npm:pi-mlx-vision@0.1.0
+# from the npm registry (listed on pi.dev/packages) — installs latest
+pi install npm:pi-mlx-vision
+
+# or pin a version
+pi install npm:pi-mlx-vision@0.2.1
 
 # or directly from git
-pi install git:github.com/abdulchotu7/pi-mlx-vision@v0.1.0
+pi install git:github.com/abdulchotu7/pi-mlx-vision@v0.2.1
 ```
 
-First run downloads the model weights; after that each call takes a few seconds.
+First run downloads the model weights (~3.5 GB) and loads the model (~3–8 s). After that, the model stays resident for the session, so subsequent calls return in well under a second.
 
 ## Usage
 
