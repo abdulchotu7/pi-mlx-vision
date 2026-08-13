@@ -23,7 +23,7 @@ The model is [LiquidAI/LFM2.5-VL-3B-MLX-8bit](https://huggingface.co/LiquidAI/LF
 pi install /path/to/pi-local-vision
 
 # or from git
-pi install git:github.com/<user>/pi-local-vision@v0.1.0
+pi install git:github.com/abdulchotu7/pi-local-vision@v0.1.0
 
 # or via npm (once published)
 pi install npm:pi-local-vision@0.1.0
