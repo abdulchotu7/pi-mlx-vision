@@ -36,6 +36,10 @@ class VisionModel:
         if self._model is None:
             self._model, self._processor = load(self._model_id)
 
+    def warm(self) -> None:
+        """Load the model if not already loaded (used to preload in a persistent server)."""
+        self._ensure_loaded()
+
     def describe(
         self,
         image: str,

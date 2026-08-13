@@ -9,6 +9,7 @@ Registers a `describe_image` tool backed by a local vision language model so you
 ## How it works
 
 - **`describe_image` tool** — takes an image path or URL and an optional question; runs the local VLM and returns a text description.
+- **Persistent inference server** — the model is loaded once per session and kept resident (`vision_server.py`, a minimal stdio protocol). Warm calls take ~0.3–1.3 s instead of re-loading the 3.5 GB model every time; parallel tool calls serialize on one model.
 - **Attached images** — when you attach an image to a pi prompt, the extension saves it to `.pi/attachments/` and tells the model about it. The model then decides whether to call `describe_image`.
 - The vision model is a passive responder: it only answers the specific question the main model asks. It never plans or decides anything.
 
@@ -50,7 +51,8 @@ VISION_MODEL_ID=mlx-community/other-vlm-4bit uv run vision.py image.png
 ## Development
 
 ```bash
-uv run vision.py path/to/image.png --prompt "What do you see?"
+uv run vision.py path/to/image.png --prompt "What do you see?"   # one-shot CLI
+uv run vision_server.py                                          # persistent stdio server (used by the extension)
 ```
 
-`vision.py` is a thin CLI over the reusable `VisionModel` interface in `vision_model.py`.
+`vision.py` and `vision_server.py` are thin wrappers over the reusable `VisionModel` interface in `vision_model.py`.

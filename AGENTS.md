@@ -27,7 +27,7 @@ The project is being developed on an Apple Silicon Mac (M5 Air) using MLX.
 
 This repository is in the prototype phase.
 
-We are currently implementing Milestone 2: exposing the validated vision model behind a reusable interface and integrating it into Pi as a callable capability.
+Milestone 1 (CLI) and Milestone 2 (Pi integration) are complete; the package is published on npm and GitHub. Milestone 3 (persistent inference server) is complete.
 
 Avoid building unnecessary abstractions or production infrastructure.
 
@@ -49,22 +49,20 @@ Deliverable: `vision.py` (CLI entry point).
 
 ---
 
-## Milestone 2 (ACTIVE)
+## Milestone 2 (COMPLETE)
 
 - expose the vision model behind a reusable interface
 - integrate it into Pi as a callable capability
 - allow DeepSeek to decide when vision should be invoked
 
-Plan:
+Deliverables:
 
 - `vision_model.py` — reusable `VisionModel` interface (lazy model load, `describe(image, prompt)`)
 - `vision.py` — thin CLI wrapper over `VisionModel`
-- `.pi/extensions/vision.ts` — Pi extension registering a `describe_image` tool that runs the local model
+- `extensions/vision.ts` — Pi extension registering a `describe_image` tool that runs the local model
 - attached images are saved to `.pi/attachments/` and surfaced to DeepSeek, which decides whether to invoke `describe_image`
 
-DeepSeek remains responsible for planning and generating the final response.
-
-The vision model only provides visual understanding.
+Status: published as `pi-mlx-vision` on npm (pi.dev catalog) and GitHub.
 
 ---
 
@@ -108,9 +106,25 @@ When multiple implementations are possible:
 
 ---
 
+## Milestone 3 (COMPLETE)
+
+Infrastructure optimization of the inference path.
+
+Problem: each `describe_image` call spawned a fresh process that re-imported mlx_vlm and re-loaded the 3.5 GB model (~3 s of fixed startup per call); parallel tool calls meant two concurrent model loads.
+
+Solution: a persistent stdio server (`vision_server.py`) that keeps the model resident for the session. The extension spawns it on first use, serializes requests by id, and kills it on session shutdown.
+
+Measured: warm calls 0.3-1.3 s (was ~3.7 s); pi end-to-end cold 8.2 s -> warm 3.2 s; no orphan processes (server exits on stdin EOF).
+
+DeepSeek remains responsible for planning and generating the final response.
+
+The vision model only provides visual understanding.
+
+---
+
 ## Out of Scope
 
-Until Milestone 2 is complete, do not implement:
+Do not implement:
 
 - memory systems
 - RAG

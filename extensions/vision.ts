@@ -7,10 +7,16 @@
  * the model by saving them to disk and injecting a note, since text-only
  * models cannot see base64 images.
  *
- * Install: `pi install <this directory>` (global) or `pi install git:...@tag`.
+ * The tool talks to a persistent stdio server (vision_server.py): the model is
+ * loaded once per session and reused across calls, instead of re-loading the
+ * 3.5 GB model on every invocation. The server exits when pi closes its stdin.
+ *
+ * Install: `pi install npm:pi-mlx-vision@0.1.0` (or git:...@tag).
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { spawn, type ChildProcess } from "node:child_process";
+import { createInterface } from "node:readline";
 import { isAbsolute, join, resolve } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -18,6 +24,7 @@ import { fileURLToPath } from "node:url";
 // Package root: this file lives at <root>/extensions/vision.ts
 const PROJECT_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const ATTACHMENTS_DIR = join(PROJECT_ROOT, ".pi", "attachments");
+const REQUEST_TIMEOUT_MS = 180_000;
 
 const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": ".jpg",
@@ -25,6 +32,102 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/gif": ".gif",
   "image/webp": ".webp",
 };
+
+interface PendingRequest {
+  resolve: (result: { text?: string; error?: string }) => void;
+  timer: NodeJS.Timeout;
+}
+
+let server: ChildProcess | null = null;
+let serverReady: Promise<void> | null = null;
+let nextRequestId = 1;
+const pending = new Map<number, PendingRequest>();
+
+function startServer(pi: ExtensionAPI): Promise<void> {
+  if (serverReady) return serverReady;
+
+  serverReady = new Promise<void>((resolveReady, rejectReady) => {
+    const child = spawn("uv", ["run", "vision_server.py"], {
+      cwd: PROJECT_ROOT,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    server = child;
+
+    const onExit = () => {
+      // Server died: fail any in-flight requests, allow restart on next call.
+      for (const [, req] of pending) {
+        clearTimeout(req.timer);
+        req.resolve({ error: "vision server exited unexpectedly" });
+      }
+      pending.clear();
+      server = null;
+      serverReady = null;
+      rejectReady(new Error("vision server exited before ready"));
+    };
+    child.on("exit", onExit);
+    child.stderr?.on("data", () => {}); // swallow tqdm/huggingface progress noise
+
+    const rl = createInterface({ input: child.stdout! });
+    rl.on("line", (line) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        return;
+      }
+      if (msg.event === "ready") {
+        resolveReady();
+        return;
+      }
+      if (typeof msg.id === "number") {
+        const req = pending.get(msg.id);
+        if (req) {
+          clearTimeout(req.timer);
+          pending.delete(msg.id);
+          req.resolve(msg.error ? { error: msg.error } : { text: msg.text });
+        }
+      }
+    });
+    child.on("error", (err) => {
+      // e.g. uv not found — fail ready so the tool reports a clear error.
+      rejectReady(new Error(`failed to start vision server: ${err.message}`));
+    });
+  });
+
+  // If the server fails to start, clear state so the next call retries.
+  serverReady.catch(() => {
+    serverReady = null;
+  });
+  return serverReady;
+}
+
+async function describe(
+  pi: ExtensionAPI,
+  image: string,
+  prompt?: string,
+  maxTokens?: number,
+): Promise<{ text?: string; error?: string }> {
+  await startServer(pi); // loads model on first use; reuses it afterwards
+
+  const id = nextRequestId++;
+  const payload = { id, image, prompt, max_tokens: maxTokens };
+
+  return new Promise<{ text?: string; error?: string }>((resolveReq, rejectReq) => {
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      resolveReq({ error: `vision server timed out after ${REQUEST_TIMEOUT_MS / 1000}s` });
+    }, REQUEST_TIMEOUT_MS);
+    pending.set(id, { resolve: resolveReq, timer });
+
+    if (!server || !server.stdin?.writable) {
+      clearTimeout(timer);
+      pending.delete(id);
+      resolveReq({ error: "vision server is not running" });
+      return;
+    }
+    server.stdin.write(JSON.stringify(payload) + "\n");
+  });
+}
 
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
@@ -52,30 +155,14 @@ export default function (pi: ExtensionAPI) {
           ? params.image
           : join(ctx.cwd, params.image);
 
-      const args = ["run", "vision.py", image];
-      if (params.prompt) args.push("--prompt", params.prompt);
-      if (params.max_tokens) args.push("--max-tokens", String(params.max_tokens));
-
-      let result;
-      try {
-        result = await pi.exec("uv", args, { cwd: PROJECT_ROOT, signal, timeout: 180_000 });
-      } catch (err) {
+      const result = await describe(pi, image, params.prompt, params.max_tokens);
+      if (result.error) {
         return {
-          content: [{ type: "text", text: `describe_image failed to run: ${String(err)}` }],
+          content: [{ type: "text", text: `describe_image failed: ${result.error}` }],
           details: {},
         };
       }
-
-      const output = result.stdout.trim();
-      if (result.code !== 0 || !output) {
-        return {
-          content: [
-            { type: "text", text: `describe_image failed (exit ${result.code}): ${result.stderr?.trim() || "no output"}` },
-          ],
-          details: {},
-        };
-      }
-      return { content: [{ type: "text", text: output }], details: { exitCode: result.code } };
+      return { content: [{ type: "text", text: result.text ?? "" }], details: {} };
     },
   });
 
@@ -103,5 +190,14 @@ export default function (pi: ExtensionAPI) {
         display: true,
       },
     };
+  });
+
+  // Long-lived process lifecycle: the server dies on its own when pi closes
+  // stdin, but kill explicitly on session teardown for prompt cleanup.
+  pi.on("session_shutdown", () => {
+    server?.kill();
+    server = null;
+    serverReady = null;
+    pending.clear();
   });
 }
