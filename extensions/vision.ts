@@ -31,7 +31,7 @@ export default function (pi: ExtensionAPI) {
     name: "describe_image",
     label: "Describe Image",
     description:
-      "Analyze an image with a local vision model and return a text description. " +
+      "Analyze an image with a local vision model (LiquidAI LFM2.5-VL-3B-MLX-8bit, runs on this Mac) and return a text description. " +
       "Use when the user asks about the contents of an image (an attached image or an image at a path or URL).",
     promptSnippet: "Analyze an image and describe its contents",
     promptGuidelines: [
