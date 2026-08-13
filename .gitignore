@@ -1,0 +1,18 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime artifacts
+.pi/attachments/
+
+# Test images (ad-hoc, not source)
+image.png
+Screenshot*.png
+
+# macOS
+.DS_Store
