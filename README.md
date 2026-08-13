@@ -21,6 +21,10 @@ Registers a `describe_image` tool backed by a local vision language model so you
 ## Install
 
 ```bash
+# from the npm registry (listed on pi.dev/packages)
+pi install npm:pi-mlx-vision@0.1.0
+
+# or directly from git
 pi install git:github.com/abdulchotu7/pi-mlx-vision@v0.1.0
 ```
 
