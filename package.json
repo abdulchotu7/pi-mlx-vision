@@ -2,13 +2,35 @@
   "name": "pi-mlx-vision",
   "version": "0.1.0",
   "description": "Local MLX vision for text-only models on Apple Silicon Macs: a describe_image tool backed by LiquidAI LFM2.5-VL-3B-MLX-8bit, so non-vision models (DeepSeek, etc.) can see images.",
-  "keywords": ["pi-package", "vision", "mlx", "vlm", "local", "apple-silicon", "deepseek"],
+  "keywords": [
+    "pi-package",
+    "vision",
+    "mlx",
+    "vlm",
+    "local",
+    "apple-silicon",
+    "deepseek"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abdulchotu7/pi-mlx-vision.git"
+  },
+  "files": [
+    "extensions/",
+    "vision.py",
+    "vision_model.py",
+    "pyproject.toml",
+    "uv.lock",
+    "README.md"
+  ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"
   },
   "pi": {
-    "extensions": ["./extensions"]
+    "extensions": [
+      "./extensions"
+    ]
   }
 }
