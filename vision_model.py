@@ -9,6 +9,8 @@ Usage:
 
 from __future__ import annotations
 
+import os
+
 from mlx_vlm import apply_chat_template, generate, load
 from mlx_vlm.utils import load_image
 
@@ -24,8 +26,9 @@ class VisionModel:
     (or constructing a VisionModel) is cheap.
     """
 
-    def __init__(self, model_id: str = MODEL_ID) -> None:
-        self._model_id = model_id
+    def __init__(self, model_id: str | None = None) -> None:
+        """`model_id` defaults to the env var VISION_MODEL_ID, then to the default model."""
+        self._model_id = model_id or os.environ.get("VISION_MODEL_ID") or MODEL_ID
         self._model = None
         self._processor = None
 

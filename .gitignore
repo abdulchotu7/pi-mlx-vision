@@ -9,6 +9,7 @@ __pycache__/
 
 # Runtime artifacts
 .pi/attachments/
+node_modules/
 
 # Test images (ad-hoc, not source)
 image.png

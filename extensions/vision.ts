@@ -1,21 +1,22 @@
 /**
- * Pi Vision Integration — Milestone 2 extension.
+ * Pi Vision Integration — local vision for text-only models.
  *
- * Registers a `describe_image` tool backed by the local LFM2.5-VL model so the
- * primary reasoning model (DeepSeek) can decide when visual understanding is
- * required. Also surfaces user-attached images to the model by saving them to
- * disk and injecting a note, since text-only models cannot see base64 images.
+ * Registers a `describe_image` tool backed by a local MLX vision model
+ * (LiquidAI LFM2.5-VL-3B-MLX-8bit) so the primary reasoning model can decide
+ * when visual understanding is required. Also surfaces user-attached images to
+ * the model by saving them to disk and injecting a note, since text-only
+ * models cannot see base64 images.
  *
- * Project-local placement: `.pi/extensions/vision.ts` (auto-discovered).
+ * Install: `pi install <this directory>` (global) or `pi install git:...@tag`.
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { isAbsolute, join, resolve } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Project root: this file lives at <root>/.pi/extensions/vision.ts
-const PROJECT_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..", "..");
+// Package root: this file lives at <root>/extensions/vision.ts
+const PROJECT_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const ATTACHMENTS_DIR = join(PROJECT_ROOT, ".pi", "attachments");
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -30,20 +31,28 @@ export default function (pi: ExtensionAPI) {
     name: "describe_image",
     label: "Describe Image",
     description:
-      "Analyze an image with the local vision model and return a text description. " +
-      "Use when the user asks about the contents of an image (an attached image or an image at a known path or URL).",
+      "Analyze an image with a local vision model and return a text description. " +
+      "Use when the user asks about the contents of an image (an attached image or an image at a path or URL).",
+    promptSnippet: "Analyze an image and describe its contents",
     promptGuidelines: [
       "Use describe_image when the user's request requires seeing an attached image or an image at a known path/URL; the model itself cannot see images.",
     ],
     parameters: Type.Object({
-      image: Type.String({ description: "Path or URL of the image to analyze" }),
+      image: Type.String({ description: "Path or URL of the image to analyze (relative paths resolve against the working directory)" }),
       prompt: Type.Optional(Type.String({ description: "Question to ask about the image (default: describe it)" })),
       max_tokens: Type.Optional(Type.Integer({ description: "Maximum tokens to generate (default: 200)" })),
     }),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       onUpdate?.({ content: [{ type: "text", text: "Running local vision model…" }] });
 
-      const args = ["run", "vision.py", params.image];
+      // Resolve relative image paths against the user's working directory,
+      // not the package root (the tool may be called from any project).
+      const image =
+        /^https?:\/\//i.test(params.image) || isAbsolute(params.image)
+          ? params.image
+          : join(ctx.cwd, params.image);
+
+      const args = ["run", "vision.py", image];
       if (params.prompt) args.push("--prompt", params.prompt);
       if (params.max_tokens) args.push("--max-tokens", String(params.max_tokens));
 

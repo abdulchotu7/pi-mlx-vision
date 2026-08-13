@@ -1,0 +1,14 @@
+{
+  "name": "pi-local-vision",
+  "version": "0.1.0",
+  "description": "Local vision for text-only models: describe_image tool backed by LFM2.5-VL (MLX) so the main model can see images.",
+  "keywords": ["pi-package", "vision", "mlx", "vlm", "local"],
+  "license": "MIT",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": ["./extensions"]
+  }
+}
